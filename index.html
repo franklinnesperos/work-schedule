@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="tl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Centralized Work Schedule (NZ)</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom scrollbar para sa address dropdown */
+    .suggestions-box::-webkit-scrollbar {
+      width: 6px;
+    }
+    .suggestions-box::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 p-4 md:p-6">
+  <div class="max-w-6xl mx-auto bg-white p-5 md:p-6 rounded-xl shadow-md space-y-6">
+    
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-3">
+      <div>
+        <p class="text-xs font-bold text-blue-600 tracking-wider uppercase">New Zealand Team Operations</p>
+        <h1 class="text-2xl font-bold text-gray-800">Centralized Work Schedule</h1>
+        <p class="text-xs text-gray-500 mt-0.5">Live synced across all devices — I-click ang address para direktang buksan sa Google Maps</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="syncStatus" class="text-xs bg-yellow-100 text-yellow-800 font-semibold px-3 py-1.5 rounded-full">Kumokonekta...</span>
+      </div>
+    </div>
+
+    <!-- Add / Edit Schedule Form -->
+    <div class="bg-blue-50/60 border border-blue-100 p-4 rounded-xl space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 id="formTitle" class="font-bold text-gray-800 text-base">➕ Magdagdag ng Bagong Schedule</h2>
+        <button id="cancelEditBtn" onclick="resetForm()" class="hidden text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-2.5 py-1 rounded">
+          Kanselahin ang Edit
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <!-- Name -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Name (Pangalan) *</label>
+          <input type="text" id="workerName" placeholder="e.g. Franklin Nesperos" class="w-full border border-gray-300 p-2 rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <!-- Date -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Date (Petsa) *</label>
+          <input type="date" id="workDate" class="w-full border border-gray-300 p-2 rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <!-- Location with NZ Autocomplete -->
+        <div class="relative">
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Location (NZ Address Search) *</label>
+          <div class="relative">
+            <input type="text" id="workLocation" autocomplete="off" placeholder="Mag-type ng address sa NZ..." class="w-full border border-gray-300 p-2 pr-8 rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            <span id="locationSpinner" class="hidden absolute right-2.5 top-2.5 text-xs text-blue-600 animate-pulse">⏳</span>
+          </div>
+          <!-- Autocomplete Suggestions Dropdown -->
+          <ul id="addressSuggestions" class="suggestions-box hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto divide-y divide-gray-100 text-xs"></ul>
+        </div>
+
+        <!-- Remarks -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Remarks (Status / Task)</label>
+          <input type="text" id="workRemarks" placeholder="e.g. Gib Stopping / Skimming / Urgent" class="w-full border border-gray-300 p-2 rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <!-- Comments -->
+        <div class="md:col-span-2">
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Comments / Notes</label>
+          <input type="text" id="workComments" placeholder="e.g. Lockbox code 1234, dalhin ang scaffolding..." class="w-full border border-gray-300 p-2 rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+      </div>
+
+      <button id="saveScheduleBtn" onclick="saveSchedule()" class="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition shadow-sm">
+        I-save at I-publish sa Live Schedule
+      </button>
+    </div>
+
+    <!-- Filter & Search Bar -->
+    <div class="flex flex-col sm:flex-row justify-between items-center gap-3 pt-2">
+      <h2 class="text-lg font-bold text-gray-800">📋 Live Schedule Board</h2>
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <input type="text" id="searchFilter" onkeyup="renderTable()" placeholder="Hanapin ang pangalan, petsa, o lugar..." class="w-full sm:w-72 border border-gray-300 px-3 py-1.5 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+      </div>
+    </div>
+
+    <!-- Schedule Table -->
+    <div class="overflow-x-auto rounded-xl border border-gray-200">
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr class="bg-gray-200 text-gray-700 text-xs uppercase tracking-wider">
+            <th class="p-3">Date</th>
+            <th class="p-3">Name</th>
+            <th class="p-3">Location (Click for Map)</th>
+            <th class="p-3">Remarks</th>
+            <th class="p-3">Comments</th>
+            <th class="p-3 text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody id="scheduleTableBody" class="divide-y divide-gray-200 bg-white text-sm">
+          <tr>
+            <td colspan="6" class="p-6 text-center text-gray-400 italic">Kinukuha ang live schedule...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="max-w-6xl mx-auto mt-3 text-left">
+    <p class="text-xs font-semibold text-gray-600">DEVELOPER : Franklin Nesperos</p>
+  </div>
+
+  <!-- Firebase & NZ Address Search Script -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD8kZ7TJ8_8h2kZ02MeXU4LHTofzMzy23g",
+      authDomain: "maynilad-calculator.firebaseapp.com",
+      projectId: "maynilad-calculator",
+      storageBucket: "maynilad-calculator.firebasestorage.app",
+      messagingSenderId: "236444081363",
+      appId: "1:236444081363:web:9293f7d7817484be7cc826"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Hiwalay na collection para sa Centralized Work Schedule
+    const scheduleDocRef = doc(db, "work_schedule", "master_board");
+
+    let schedules = [];
+    let editingId = null;
+
+    // Default date = Today (NZ)
+    document.getElementById('workDate').valueAsDate = new Date();
+
+    // Real-time Listener mula sa Firebase
+    onSnapshot(scheduleDocRef, (docSnap) => {
+      const syncStatus = document.getElementById('syncStatus');
+      if (docSnap.exists()) {
+        schedules = docSnap.data().items || [];
+      } else {
+        schedules = [];
+        syncToFirebase(schedules);
+      }
+      renderTable();
+      syncStatus.innerText = "🟢 Live Synced";
+      syncStatus.className = "text-xs bg-green-100 text-green-800 font-semibold px-3 py-1.5 rounded-full";
+    }, (error) => {
+      console.error("Firebase Sync Error:", error);
+      const syncStatus = document.getElementById('syncStatus');
+      syncStatus.innerText = "🔴 Sync Error";
+      syncStatus.className = "text-xs bg-red-100 text-red-800 font-semibold px-3 py-1.5 rounded-full";
+    });
+
+    async function syncToFirebase(itemsList) {
+      try {
+        await setDoc(scheduleDocRef, { items: itemsList });
+      } catch (e) {
+        alert("May error sa pag-save sa database. Pakisubukan muli.");
+      }
+    }
+
+    // ==========================================
+    // NEW ZEALAND ADDRESS AUTOCOMPLETE SEARCH
+    // ==========================================
+    const locationInput = document.getElementById('workLocation');
+    const suggestionsBox = document.getElementById('addressSuggestions');
+    const locationSpinner = document.getElementById('locationSpinner');
+    let searchTimeout = null;
+
+    locationInput.addEventListener('input', function() {
+      const query = this.value.trim();
+      clearTimeout(searchTimeout);
+
+      if (query.length < 3) {
+        suggestionsBox.classList.add('hidden');
+        suggestionsBox.innerHTML = '';
+        return;
+      }
+
+      searchTimeout = setTimeout(() => {
+        fetchNZAddresses(query);
+      }, 400); // 400ms debounce para mabilis at hindi ma-spam ang API
+    });
+
+    async function fetchNZAddresses(query) {
+      locationSpinner.classList.remove('hidden');
+      try {
+        // Naka-lock sa New Zealand (countrycodes=nz)
+        const url = `https://nominatim.openstreetmap.org/search?format=json&countrycodes=nz&addressdetails=1&limit=6&q=${encodeURIComponent(query)}`;
+        const response = await fetch(url, {
+          headers: { 'Accept-Language': 'en' }
+        });
+        const results = await response.json();
+
+        suggestionsBox.innerHTML = '';
+        if (results.length > 0) {
+          results.forEach(place => {
+            // Linisin ang display name para tanggalin ang ", New Zealand" kung gusto mas maikli, o panatilihin para malinaw
+            const cleanAddress = place.display_name.replace(/, New Zealand$/i, '');
+            const li = document.createElement('li');
+            li.className = "p-2.5 hover:bg-blue-50 cursor-pointer flex items-start gap-2 transition";
+            li.innerHTML = `<span class="text-red-500 mt-0.5">📍</span><span class="text-gray-700 leading-snug">${cleanAddress}</span>`;
+            li.onclick = () => {
+              locationInput.value = cleanAddress;
+              suggestionsBox.classList.add('hidden');
+            };
+            suggestionsBox.appendChild(li);
+          });
+          suggestionsBox.classList.remove('hidden');
+        } else {
+          suggestionsBox.innerHTML = `<li class="p-2.5 text-gray-400 italic">Walang nahanap na exact match sa NZ — pwede mo pa ring i-type nang buo.</li>`;
+          suggestionsBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        console.error("Address search error:", err);
+      } finally {
+        locationSpinner.classList.add('hidden');
+      }
+    }
+
+    // Itago ang dropdown kapag nag-click sa labas
+    document.addEventListener('click', (e) => {
+      if (!locationInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+        suggestionsBox.classList.add('hidden');
+      }
+    });
+
+    // ==========================================
+    // SAVE, EDIT & DELETE FUNCTIONS
+    // ==========================================
+    window.saveSchedule = async function() {
+      const name = document.getElementById('workerName').value.trim();
+      const date = document.getElementById('workDate').value;
+      const location = document.getElementById('workLocation').value.trim();
+      const remarks = document.getElementById('workRemarks').value.trim();
+      const comments = document.getElementById('workComments').value.trim();
+
+      if (!name || !date || !location) {
+        return alert("Pakilagay ang Name, Date, at Location.");
+      }
+
+      if (editingId) {
+        const index = schedules.findIndex(item => item.id === editingId);
+        if (index !== -1) {
+          schedules[index] = { id: editingId, name, date, location, remarks, comments };
+        }
+      } else {
+        schedules.push({
+          id: Date.now().toString(),
+          name,
+          date,
+          location,
+          remarks,
+          comments
+        });
+      }
+
+      // I-sort ayon sa petsa (pinakabago o papalapit na petsa sa taas)
+      schedules.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      await syncToFirebase(schedules);
+      resetForm();
+    };
+
+    window.editSchedule = function(id) {
+      const item = schedules.find(s => s.id === id);
+      if (!item) return;
+
+      editingId = id;
+      document.getElementById('workerName').value = item.name;
+      document.getElementById('workDate').value = item.date;
+      document.getElementById('workLocation').value = item.location;
+      document.getElementById('workRemarks').value = item.remarks || '';
+      document.getElementById('workComments').value = item.comments || '';
+
+      document.getElementById('formTitle').innerText = "✏️ I-edit ang Schedule";
+      document.getElementById('saveScheduleBtn').innerText = "💾 I-update ang Schedule";
+      document.getElementById('saveScheduleBtn').className = "w-full bg-amber-600 text-white py-2.5 rounded-lg font-semibold hover:bg-amber-700 transition shadow-sm";
+      document.getElementById('cancelEditBtn').classList.remove('hidden');
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    window.deleteSchedule = async function(id) {
+      if (!confirm("Sigurado ka bang gusto mong burahin ang schedule na ito?")) return;
+      schedules = schedules.filter(item => item.id !== id);
+      await syncToFirebase(schedules);
+    };
+
+    window.resetForm = function() {
+      editingId = null;
+      document.getElementById('workerName').value = '';
+      document.getElementById('workDate').valueAsDate = new Date();
+      document.getElementById('workLocation').value = '';
+      document.getElementById('workRemarks').value = '';
+      document.getElementById('workComments').value = '';
+
+      document.getElementById('formTitle').innerText = "➕ Magdagdag ng Bagong Schedule";
+      document.getElementById('saveScheduleBtn').innerText = "I-save at I-publish sa Live Schedule";
+      document.getElementById('saveScheduleBtn').className = "w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition shadow-sm";
+      document.getElementById('cancelEditBtn').classList.add('hidden');
+    };
+
+    // ==========================================
+    // RENDER TABLE WITH DIRECT GOOGLE MAPS LINK
+    // ==========================================
+    window.renderTable = function() {
+      const tbody = document.getElementById('scheduleTableBody');
+      const filterText = document.getElementById('searchFilter').value.toLowerCase().trim();
+      tbody.innerHTML = '';
+
+      const filtered = schedules.filter(item => {
+        return (
+          item.name.toLowerCase().includes(filterText) ||
+          item.date.toLowerCase().includes(filterText) ||
+          item.location.toLowerCase().includes(filterText) ||
+          (item.remarks && item.remarks.toLowerCase().includes(filterText)) ||
+          (item.comments && item.comments.toLowerCase().includes(filterText))
+        );
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-gray-400 italic">Walang nakitang schedule.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach(item => {
+        // Format date para mas madaling basahin (e.g. Nov 21, 2026)
+        const formattedDate = new Date(item.date + 'T00:00:00').toLocaleDateString('en-NZ', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+
+        // Direct Google Maps Search Link (naka-append ang New Zealand para siguradong tumpak ang pin)
+        const mapQuery = encodeURIComponent(`${item.location}, New Zealand`);
+        const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapQuery}`;
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-gray-50 transition";
+        tr.innerHTML = `
+          <td class="p-3 font-medium text-gray-700 whitespace-nowrap">${formattedDate}</td>
+          <td class="p-3 font-bold text-gray-900 whitespace-nowrap">${escapeHtml(item.name)}</td>
+          <td class="p-3">
+            <a href="${googleMapsUrl}" target="_blank" rel="noopener noreferrer" title="Buksan sa Google Maps" class="inline-flex items-start gap-1.5 text-blue-600 hover:text-blue-800 hover:underline font-medium">
+              <span class="mt-0.5">📍</span>
+              <span>${escapeHtml(item.location)}</span>
+            </a>
+          </td>
+          <td class="p-3">
+            ${item.remarks 
+              ? `<span class="inline-block bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">${escapeHtml(item.remarks)}</span>` 
+              : '<span class="text-gray-400 text-xs">-</span>'}
+          </td>
+          <td class="p-3 text-gray-600 text-xs max-w-xs">${escapeHtml(item.comments || '-')}</td>
+          <td class="p-3 text-center whitespace-nowrap">
+            <button onclick="editSchedule('${item.id}')" class="text-amber-600 hover:text-amber-800 font-semibold text-xs px-2 py-1 rounded hover:bg-amber-50">✏️ Edit</button>
+            <button onclick="deleteSchedule('${item.id}')" class="text-red-600 hover:text-red-800 font-semibold text-xs px-2 py-1 rounded hover:bg-red-50">🗑️ Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    };
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
